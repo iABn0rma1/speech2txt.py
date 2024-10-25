@@ -1,45 +1,44 @@
-import os
 from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 import speech_recognition as sr
-from pydub import AudioSegment
+import os
 
 app = FastAPI()
 
-# Serve static files (CSS and JS)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-@app.get("/", response_class=HTMLResponse)
-async def read_root():
-    with open("index.html") as f:
-        return f.read()
-
 @app.post("/upload-audio/")
 async def upload_audio(file: UploadFile = File(...)):
-    recognizer = sr.Recognizer()
-
-    # Save the uploaded audio file temporarily
-    webm_file_location = "temp_audio.webm"
-    wav_file_location = "temp_audio.wav"
-
-    with open(webm_file_location, "wb") as audio_file:
-        audio_file.write(await file.read())
-
-    # Convert WebM to WAV
+    # Save the uploaded file
+    audio_file_path = "uploaded_audio.webm"
+    
+    # Writing the audio file to disk
     try:
-        audio = AudioSegment.from_file(webm_file_location, format='webm')
-        audio.export(wav_file_location, format='wav')
-
-        # Process the audio file
-        with sr.AudioFile(wav_file_location) as source:
-            audio_data = recognizer.record(source)
-            text = recognizer.recognize_google(audio_data, language='hi-IN')
-            return {"text": text}
+        with open(audio_file_path, "wb") as f:
+            f.write(await file.read())
     except Exception as e:
-        return {"text": f"Error processing audio: {e}"}
-    finally:
-        # Clean up temporary files
-        for temp_file in [webm_file_location, wav_file_location]:
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
+        return JSONResponse(content={"error": f"Error saving file: {str(e)}"}, status_code=500)
+
+    # Initialize the recognizer
+    recognizer = sr.Recognizer()
+    
+    try:
+        # Use the audio file for speech recognition
+        with sr.AudioFile(audio_file_path) as source:
+            audio = recognizer.record(source)  # read the entire audio file
+            text = recognizer.recognize_google(audio, language='hi-IN')
+
+        # Remove the file after processing
+        os.remove(audio_file_path)
+
+        # Return the recognized text
+        return JSONResponse(content={"text": text})
+
+    except sr.UnknownValueError:
+        return JSONResponse(content={"error": "Could not understand audio"}, status_code=400)
+    except sr.RequestError as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
