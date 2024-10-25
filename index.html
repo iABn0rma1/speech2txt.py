@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hindi Speech to Text</title>
+    <link rel="stylesheet" href="static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Hindi Speech to Text</h1>
+        <button id="start-btn">Start Recording</button>
+        <div id="output" class="output"></div>
+    </div>
+
+    <script>
+        const output = document.getElementById('output');
+        const startBtn = document.getElementById('start-btn');
+
+        startBtn.addEventListener('click', async () => {
+            output.innerHTML = "Recording...";
+
+            // Start recording audio
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            let audioChunks = [];
+
+            mediaRecorder.start();
+
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const formData = new FormData();
+                formData.append('file', audioBlob, 'audio.webm');
+
+                // Send the audio file to the server
+                const response = await fetch('/upload-audio/', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                output.innerHTML = `You said: ${result.text}`;
+            };
+
+            // Stop recording after a set time
+            setTimeout(() => {
+                mediaRecorder.stop();
+                output.innerHTML = "Processing...";
+            }, 5000);  // Adjust recording duration (in milliseconds)
+        });
+    </script>
+</body>
+</html>
