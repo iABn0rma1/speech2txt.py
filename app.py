@@ -43,7 +43,3 @@ async def upload_audio(file: UploadFile = File(...)):
         for temp_file in [webm_file_location, wav_file_location]:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
