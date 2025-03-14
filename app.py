@@ -19,27 +19,29 @@ async def read_root():
 async def upload_audio(file: UploadFile = File(...)):
     recognizer = sr.Recognizer()
 
-    # Save the uploaded audio file temporarily
-    webm_file_location = "temp_audio.webm"
-    wav_file_location = "temp_audio.wav"
+    # Get file extension
+    input_ext = file.filename.split(".")[-1].lower()
+    input_file_path = f"temp_audio.{input_ext}"
+    output_wav_path = "temp_audio.wav"
 
-    with open(webm_file_location, "wb") as audio_file:
-        audio_file.write(await file.read())
-
-    # Convert WebM to WAV
     try:
-        audio = AudioSegment.from_file(webm_file_location, format='webm')
-        audio.export(wav_file_location, format='wav')
+        # Temporarily save the audio file
+        with open(input_file_path, "wb") as audio_file:
+            audio_file.write(await file.read())
 
-        # Process the audio file
-        with sr.AudioFile(wav_file_location) as source:
+        # Convert to WAV, using pydub
+        audio = AudioSegment.from_file(input_file_path)
+        audio.export(output_wav_path, format="wav")
+
+        # Process the WAV file
+        with sr.AudioFile(output_wav_path) as source:
             audio_data = recognizer.record(source)
-            text = recognizer.recognize_google(audio_data, language='hi-IN')
+            text = recognizer.recognize_google(audio_data)
             return {"text": text}
     except Exception as e:
-        return {"text": f"Error processing audio: {e}"}
+        return {"error": f"Error processing audio: {e}"}
     finally:
         # Clean up temporary files
-        for temp_file in [webm_file_location, wav_file_location]:
+        for temp_file in [input_file_path, output_wav_path]:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
